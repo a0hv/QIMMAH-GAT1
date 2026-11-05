@@ -342,6 +342,7 @@ const StudentApp = {
     App.switchView('viewPracticeRunner');
     this.renderPracticePalette();
     this.renderPracticeQuestion();
+    App.onTestStarted('skills');
   },
 
   // PRACTICE / SKILL TEST QUESTION PALETTE
@@ -702,24 +703,23 @@ const StudentApp = {
   },
 
   confirmExitSkillTest() {
-    const modal = document.getElementById('modalConfirmExitSkillTest');
-    if (modal) {
-      modal.classList.remove('hidden');
-    } else {
+    App.showExitTestPrompt(() => {
+      App.isSubmittingTest = true;
       App.exitRunner('skills');
-    }
+      App.isSubmittingTest = false;
+    });
   },
 
   confirmExitExam() {
-    const modal = document.getElementById('modalConfirmExitExam');
-    if (modal) {
-      modal.classList.remove('hidden');
-    } else {
+    App.showExitTestPrompt(() => {
+      App.isSubmittingTest = true;
       App.exitRunner('exams');
-    }
+      App.isSubmittingTest = false;
+    });
   },
 
   async finishSkillTest() {
+    App.isSubmittingTest = true;
     const durationSeconds = Math.round((Date.now() - this.skillTestStartTime) / 1000);
     App.showLoading(true);
 
@@ -935,6 +935,7 @@ const StudentApp = {
     App.switchView('viewExamRunner');
     this.renderQuestionPalette();
     this.renderExamQuestion();
+    App.onTestStarted('exams');
 
     if (this.isTimedMode) {
       this.startExamTimer();
@@ -1157,6 +1158,7 @@ const StudentApp = {
   },
 
   async submitExam(auto = false) {
+    App.isSubmittingTest = true;
     if (this.examTimerInterval) clearInterval(this.examTimerInterval);
 
     const durationSeconds = Math.round((Date.now() - this.examStartTime) / 1000);

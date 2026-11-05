@@ -29,6 +29,8 @@ const App = {
   ],
   demoCurrentIdx: 0,
   demoScore: 0,
+  isSubmittingTest: false,
+  pendingExitCallback: null,
 
   init() {
     this.initTheme();
@@ -203,29 +205,105 @@ const App = {
 
   // ROUTER & VIEW SWITCHING
   initRouter() {
-    window.addEventListener('hashchange', () => this.handleRoute());
+    // 1. Protection on page reload, refresh, or close tab
+    window.addEventListener('beforeunload', (e) => {
+      if (this.isTestActive()) {
+        const msg = 'سوف تفقد تقدمك وسوف يتم إعادة إرسال النموذج مرة أخرى. هل أنت متأكد؟';
+        e.preventDefault();
+        e.returnValue = msg;
+        return msg;
+      }
+    });
+
+    // 2. Protection on browser back button / history popstate
+    window.addEventListener('popstate', (e) => {
+      if (this.isTestActive()) {
+        try {
+          history.pushState({ qimmahTestActive: true }, '', window.location.href);
+        } catch (err) {}
+
+        this.showExitTestPrompt(() => {
+          const returnTo = (window.StudentApp && StudentApp.isSkillTestMode) ? 'skills' : 'exams';
+          this.isSubmittingTest = true;
+          this.exitRunner(returnTo);
+          this.isSubmittingTest = false;
+          try {
+            history.back();
+          } catch (err) {}
+        });
+        return;
+      }
+      this.handleRoute();
+    });
+
+    // 3. Protection on hash change
+    window.addEventListener('hashchange', (e) => {
+      if (this.isTestActive()) {
+        const oldURL = e.oldURL;
+        const newURL = e.newURL;
+        if (oldURL) {
+          try {
+            window.location.href = oldURL;
+          } catch (err) {}
+        }
+        this.showExitTestPrompt(() => {
+          const returnTo = (window.StudentApp && StudentApp.isSkillTestMode) ? 'skills' : 'exams';
+          this.isSubmittingTest = true;
+          this.exitRunner(returnTo);
+          this.isSubmittingTest = false;
+          if (newURL) {
+            window.location.href = newURL;
+          }
+        });
+        return;
+      }
+      this.handleRoute();
+    });
+
     window.addEventListener('auth:expired', () => {
       this.showToast('انتهت جلسة تسجيل الدخول، يرجى الدخول مجدداً.', 'info');
       this.switchLayout('public');
       this.updateNavbar();
     });
 
-    // Intercept clicks on links to ensure returning from runners/modals always works seamlessly
+    // 4. Intercept clicks on links while test is active
     document.addEventListener('click', (e) => {
-      const link = e.target.closest('a[href^="#student"]');
-      if (link) {
+      const link = e.target.closest('a[href]');
+      if (!link) return;
+
+      if (this.isTestActive()) {
+        if (link.closest('#viewPracticeRunner') || link.closest('#viewExamRunner')) {
+          return;
+        }
+
+        e.preventDefault();
+        e.stopPropagation();
         const href = link.getAttribute('href');
-        const activeRunner = ['viewPracticeRunner', 'viewExamRunner', 'viewExamResults'].some(id => {
-          const el = document.getElementById(id);
-          return el && !el.classList.contains('hidden');
+
+        this.showExitTestPrompt(() => {
+          const returnTo = (window.StudentApp && StudentApp.isSkillTestMode) ? 'skills' : 'exams';
+          this.isSubmittingTest = true;
+          this.exitRunner(returnTo);
+          this.isSubmittingTest = false;
+          if (href) {
+            if (href.startsWith('#')) window.location.hash = href;
+            else window.location.href = href;
+          }
         });
-        if (activeRunner) {
+        return;
+      }
+
+      // If viewing exam results (completed, not in-progress test), allow seamless student navigation
+      const studentLink = link.closest('a[href^="#student"]');
+      if (studentLink) {
+        const resEl = document.getElementById('viewExamResults');
+        if (resEl && !resEl.classList.contains('hidden')) {
           e.preventDefault();
-          const target = href.replace('#student/', '').replace('#student', 'dashboard') || 'dashboard';
+          const target = studentLink.getAttribute('href').replace('#student/', '').replace('#student', 'dashboard') || 'dashboard';
           this.exitRunner(target);
         }
       }
-    });
+    }, true);
 
     this.handleRoute();
   },
@@ -469,7 +547,63 @@ const App = {
     }
   },
 
+  // TEST ACTIVE STATE & EXIT PROTECTION
+  isTestActive() {
+    if (this.isSubmittingTest) return false;
+
+    const practiceEl = document.getElementById('viewPracticeRunner');
+    const isPracticeActive = practiceEl && !practiceEl.classList.contains('hidden') &&
+      window.StudentApp && (StudentApp.isSkillTestMode || StudentApp.currentTestId);
+
+    const examEl = document.getElementById('viewExamRunner');
+    const isExamActive = examEl && !examEl.classList.contains('hidden') &&
+      window.StudentApp && StudentApp.activeExam;
+
+    return !!(isPracticeActive || isExamActive);
+  },
+
+  onTestStarted(type) {
+    this.isSubmittingTest = false;
+    try {
+      history.pushState({ qimmahTestActive: true, type }, '', window.location.href);
+    } catch (e) {}
+  },
+
+  showExitTestPrompt(onConfirm) {
+    this.pendingExitCallback = onConfirm;
+    const modal = document.getElementById('modalConfirmExitActiveTest');
+    if (modal) {
+      modal.classList.remove('hidden');
+    } else {
+      if (confirm('سوف تفقد تقدمك وسوف يتم إعادة إرسال النموذج مرة أخرى. هل أنت متأكد؟')) {
+        if (typeof onConfirm === 'function') onConfirm();
+      }
+    }
+  },
+
+  cancelExitTestPrompt() {
+    const modal = document.getElementById('modalConfirmExitActiveTest');
+    if (modal) modal.classList.add('hidden');
+    this.pendingExitCallback = null;
+  },
+
+  confirmExitTestPrompt() {
+    const modal = document.getElementById('modalConfirmExitActiveTest');
+    if (modal) modal.classList.add('hidden');
+    const cb = this.pendingExitCallback;
+    this.pendingExitCallback = null;
+    if (typeof cb === 'function') {
+      cb();
+    } else {
+      const returnTo = (window.StudentApp && StudentApp.isSkillTestMode) ? 'skills' : 'exams';
+      this.isSubmittingTest = true;
+      this.exitRunner(returnTo);
+      this.isSubmittingTest = false;
+    }
+  },
+
   exitRunner(returnTo) {
+    this.isSubmittingTest = true;
     let targetHash = '#student';
     if (returnTo === 'skills') targetHash = '#student/skills';
     else if (returnTo === 'exams' || returnTo === 'aggregated-tests') targetHash = '#student/aggregated-tests';
@@ -478,14 +612,19 @@ const App = {
     else if (returnTo === 'profile') targetHash = '#student/profile';
     else targetHash = '#student';
 
-    // 1. Clear any active exam timer intervals
-    if (window.StudentApp && StudentApp.examTimerInterval) {
-      clearInterval(StudentApp.examTimerInterval);
-      StudentApp.examTimerInterval = null;
+    // 1. Clear any active exam timer intervals & reset state
+    if (window.StudentApp) {
+      if (StudentApp.examTimerInterval) {
+        clearInterval(StudentApp.examTimerInterval);
+        StudentApp.examTimerInterval = null;
+      }
+      if (typeof StudentApp.resetState === 'function') {
+        StudentApp.resetState();
+      }
     }
 
     // 2. Hide all modals and runners explicitly
-    ['modalConfirmSubmitSkillTest', 'modalConfirmExitSkillTest', 'modalConfirmExitExam', 'modalExamModeSelect'].forEach(mId => {
+    ['modalConfirmSubmitSkillTest', 'modalConfirmExitSkillTest', 'modalConfirmExitExam', 'modalConfirmExitActiveTest', 'modalExamModeSelect'].forEach(mId => {
       const m = document.getElementById(mId);
       if (m) m.classList.add('hidden');
     });
@@ -506,6 +645,7 @@ const App = {
       window.location.hash = targetHash;
     }
 
+    this.isSubmittingTest = false;
     window.scrollTo({ top: 0, behavior: 'smooth' });
   },
 
