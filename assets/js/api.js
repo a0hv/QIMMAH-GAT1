@@ -147,7 +147,17 @@ const API = {
   getUser() {
     try {
       const u = localStorage.getItem(this.userKey);
-      return u ? JSON.parse(u) : null;
+      if (!u) return null;
+      const parsed = JSON.parse(u);
+      // Security Check: If user has role admin, verify active admin authorization
+      if (parsed && parsed.role === 'admin') {
+        if (parsed.adminSecretVersion !== 'v2026_AAGSAM0541378802') {
+          console.warn('[Security] Outdated or unauthorized admin session detected and revoked.');
+          this.clearAuth();
+          return null;
+        }
+      }
+      return parsed;
     } catch (e) {
       return null;
     }
@@ -635,8 +645,17 @@ const API = {
       const code = (body.accessCode || '').trim().replace(/\s+/g, '').toUpperCase();
       const stripped = code.replace(/-/g, '');
 
-      // Check admin
-      const adminCodes = ['Aa1482010FGFG', 'AA1482010FGFG', 'QIMMAH-ADMIN-2026', 'ADMIN777', 'ADMIN-777'];
+      // Explicitly block all old or revoked admin codes
+      const revokedCodes = ['AA1482010FGFG', 'QIMMAH-ADMIN-2026', 'ADMIN777', 'ADMIN-777'];
+      if (revokedCodes.includes(code) || revokedCodes.includes(stripped)) {
+        return {
+          success: false,
+          message: 'تم إلغاء صلاحية هذا الكود القديم نهائياً ولا يمكن استخدامه.'
+        };
+      }
+
+      // Check admin - Only official active admin code: AAGSAM0541378802
+      const adminCodes = ['AAGSAM0541378802'];
       const isAdmin = adminCodes.some(c => c.toUpperCase() === code || c.toUpperCase().replace(/-/g, '') === stripped);
 
       if (isAdmin) {
@@ -644,7 +663,9 @@ const API = {
           id: 'user-admin-1',
           name: 'الأستاذ جابر القاضي',
           role: 'admin',
-          email: 'admin@alqimmah.com'
+          email: 'admin@alqimmah.com',
+          accessCode: 'AAGSAM0541378802',
+          adminSecretVersion: 'v2026_AAGSAM0541378802'
         };
         const token = 'standalone-token-admin-' + Date.now();
         return {
