@@ -13,6 +13,66 @@
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   
+  <!-- Anti-Inspect & DevTools Protection Shield -->
+  <script>
+    (function() {
+      // 1. Disable Right-Click Context Menu (Inspect, View Page Source, etc.)
+      document.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+        return false;
+      }, { capture: true });
+
+      // 2. Disable DevTools & Inspect Keyboard Shortcuts
+      document.addEventListener('keydown', function(e) {
+        // F12 key
+        if (e.key === 'F12' || e.keyCode === 123) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+        // Ctrl+Shift+I / Ctrl+Shift+J / Ctrl+Shift+C (Inspect Elements / Console)
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && ['I', 'i', 'J', 'j', 'C', 'c'].includes(e.key)) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+        // Ctrl+U (View Source) & Ctrl+S (Save Page)
+        if ((e.ctrlKey || e.metaKey) && ['u', 'U', 's', 'S'].includes(e.key)) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+      }, { capture: true });
+
+      // 3. Prevent dragging non-input elements
+      document.addEventListener('dragstart', function(e) {
+        if (e.target && !['INPUT', 'TEXTAREA'].includes(e.target.tagName)) {
+          e.preventDefault();
+        }
+      });
+
+      // 4. Console Protection & Warning Banner
+      function shieldConsole() {
+        try {
+          if (window.console) {
+            console.clear();
+            console.log(
+              '%c🛡️ منصة القمة في القدرات اللفظية | بيئة تدريبية محمية',
+              'color: #10b981; font-size: 18px; font-weight: 900; padding: 6px 12px; border: 2px solid #10b981; border-radius: 8px;'
+            );
+            console.log(
+              '%cتنبيه: بيئة الاختبارات ومحتوى الأسئلة محمي بالكامل للأستاذ جابر القاضي. يمنع فحص الأكواد أو محاولة استخراج البيانات.',
+              'color: #f59e0b; font-size: 13px; font-weight: bold; line-height: 1.6;'
+            );
+          }
+        } catch (err) {}
+      }
+
+      shieldConsole();
+      setInterval(shieldConsole, 2500);
+    })();
+  </script>
+
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -2668,10 +2728,10 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
   <!-- Scripts -->
-  <script src="./assets/data/bundle.js?v=20261106_5"></script>
-  <script src="./assets/js/api.js?v=20261106_5"></script>
-  <script src="./assets/js/student.js?v=20261106_5"></script>
-  <script src="./assets/js/admin.js?v=20261106_5"></script>
-  <script src="./assets/js/app.js?v=20261106_5"></script>
+  <script src="./assets/data/bundle.js?v=20261106_6"></script>
+  <script src="./assets/js/api.js?v=20261106_6"></script>
+  <script src="./assets/js/student.js?v=20261106_6"></script>
+  <script src="./assets/js/admin.js?v=20261106_6"></script>
+  <script src="./assets/js/app.js?v=20261106_6"></script>
 </body>
 </html>

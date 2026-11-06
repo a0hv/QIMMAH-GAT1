@@ -751,3 +751,18 @@ html.dark .card-corner-arrow {
   inset: 0;
   animation: geoPulseSlow 7s ease-in-out infinite;
 }
+
+/* --------------------------------------------------------------------------
+   SECURITY & ANTI-SCRAPING SHIELD
+   -------------------------------------------------------------------------- */
+.question-card, .test-surface, .exam-container, .student-card {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+img {
+  -webkit-user-drag: none;
+  user-drag: none;
+}
